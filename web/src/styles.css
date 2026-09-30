@@ -1884,3 +1884,22 @@ summary {
   font-size: 18px;
   font-weight: 650;
 }
+
+/* Overview metric cards are full-card navigation links. */
+a.stat-card {
+  display: block;
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
+}
+a.stat-card:hover,
+a.stat-card:focus-visible {
+  border-color: var(--teal, #285c4d);
+  box-shadow: 0 3px 12px #112c2b12;
+}
+a.stat-card > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}

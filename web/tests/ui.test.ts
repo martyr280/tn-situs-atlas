@@ -523,3 +523,46 @@ test("pilot import shows recipient allocation, independent confirmation and clea
     "",
   );
 });
+
+test("overview metrics drill into sorted county counts and priorities filter the queue", async () => {
+  const router = mount("/");
+  for (const [label, sort] of [
+    ["Counties represented", "name"],
+    ["Rooftops placed", "rooftops"],
+    ["Business points", "biz"],
+    ["Cross-county exposure", "cc"],
+  ]) {
+    await screen.findByRole("heading", {
+      name: "Clarity starts with the right location.",
+    });
+    fireEvent.click(screen.getByRole("link", { name: new RegExp(label) }));
+    await screen.findByRole("heading", {
+      name: "Every county. A clearer picture.",
+    });
+    assert.equal(router.state.location.pathname, "/counties");
+    assert.equal(
+      (screen.getByRole("combobox") as HTMLSelectElement).value,
+      sort,
+    );
+    assert.equal(document.querySelectorAll("tbody tr").length, 95);
+    assert.ok(screen.getByRole("columnheader", { name: "Rooftops placed" }));
+    if (sort !== "name") {
+      const col = { biz: 2, rooftops: 3, cc: 4 }[sort]!;
+      const values = [...document.querySelectorAll("tbody tr")].map((row) =>
+        Number(row.children[col].textContent!.replaceAll(",", "")),
+      );
+      assert.ok(values.every((v, i) => i === 0 || values[i - 1] >= v));
+    }
+    await act(async () => {
+      await router.navigate("/");
+    });
+  }
+  await screen.findByRole("heading", { name: "Priority counties" });
+  fireEvent.click(document.querySelector("a.priority")!);
+  await screen.findByRole("combobox", { name: "Reason" });
+  assert.equal(
+    (screen.getByRole("combobox", { name: "Reason" }) as HTMLSelectElement)
+      .value,
+    "CROSS_COUNTY_POSTAL",
+  );
+});

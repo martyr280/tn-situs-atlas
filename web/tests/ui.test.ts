@@ -46,7 +46,7 @@ globalThis.fetch = async (input: RequestInfo | URL) => {
   }
 };
 const React = await import("react");
-const { render, screen, fireEvent, waitFor, cleanup, configure } =
+const { render, screen, fireEvent, waitFor, cleanup, configure, act } =
   await import("@testing-library/react");
 const { createMemoryRouter, RouterProvider } = await import("react-router-dom");
 const App = (await import("../src/App.tsx")).default;
@@ -310,6 +310,7 @@ test("structural accessibility check on overview and sparse county", async () =>
     const router = mount(url);
     await screen.findByRole("heading", { level: 1 }, { timeout: 15000 });
     await waitFor(() => assert.ok(!screen.queryByText("Loading the atlas…")));
+    if (url !== "/") await screen.findByText(/No dated inputs published/);
     const result = await axe.run(document.body, {
       rules: { "color-contrast": { enabled: false } },
     });
@@ -324,4 +325,244 @@ test("structural accessibility check on overview and sparse county", async () =>
     cleanup();
     router.dispose();
   }
+});
+
+test("jurisdiction estimates require explicit assumptions and do not substitute TPP for licenses", async () => {
+  const Estimates = (await import("../src/Estimates.tsx")).default;
+  const catalog = JSON.parse(
+    fs.readFileSync(path.join(root, "site/data/statewide_index.json"), "utf8"),
+  );
+  const item = {
+    ...catalog.counties.find((r: any) => r.slug === "shelby"),
+    kind: "counties",
+    name: "SHELBY",
+  };
+  render(React.createElement(Estimates, { item }));
+  await screen.findByText(/No dated inputs published/);
+  const fixture = fs.readFileSync(
+    path.join(root, "web/tests/fixtures/estimates.json"),
+    "utf8",
+  );
+  await act(async () =>
+    fireEvent.change(screen.getByLabelText("Load monthly inputs (JSON)"), {
+      target: { files: [{ size: fixture.length, text: async () => fixture }] },
+    }),
+  );
+  await screen.findByText("600");
+  assert.ok(screen.getByText(/TPP schedules cannot substitute/));
+  const button = screen.getByRole("button", {
+    name: "Export tangible personal property scenario",
+  }) as HTMLButtonElement;
+  assert.equal(button.disabled, true);
+  fireEvent.change(
+    screen.getByLabelText("Tangible personal property annual amount"),
+    { target: { value: "368.008" } },
+  );
+  fireEvent.change(
+    screen.getByLabelText("Tangible personal property eligible share"),
+    { target: { value: "100" } },
+  );
+  fireEvent.change(
+    screen.getByLabelText("Tangible personal property collection rate"),
+    { target: { value: "97.28" } },
+  );
+  assert.ok(screen.getByText("$214,799"));
+  assert.equal(button.disabled, false);
+  fireEvent.change(
+    screen.getByLabelText("Tangible personal property eligible share"),
+    { target: { value: "101" } },
+  );
+  assert.equal(button.disabled, true);
+  cleanup();
+  render(
+    React.createElement(Estimates, {
+      item: { ...item, kind: "cities", slug: "ardmore", name: "ARDMORE" },
+    }),
+  );
+  await screen.findByText(/No dated inputs published/);
+  assert.equal(
+    screen.queryByRole("region", {
+      name: "Tangible personal property scenario",
+    }),
+    null,
+  );
+});
+
+test("recovery benchmark import calculates TPP with capture rate and restores the empty published state", async () => {
+  const Estimates = (await import("../src/Estimates.tsx")).default;
+  render(
+    React.createElement(Estimates, {
+      item: { kind: "counties", slug: "shelby", name: "SHELBY" } as any,
+    }),
+  );
+  await screen.findByText(/No dated inputs published/);
+  const snapshot = JSON.parse(
+    fs.readFileSync(
+      path.join(root, "web/tests/fixtures/estimates.json"),
+      "utf8",
+    ),
+  );
+  delete snapshot.records[0].tppFiled;
+  snapshot.records[0].tppBenchmarks = [
+    {
+      tax_year: 2024,
+      returns_received: 100,
+      total_tpp_collected: 10000,
+      source_note: "Synthetic",
+    },
+    {
+      tax_year: 2025,
+      returns_received: 300,
+      total_tpp_collected: 90000,
+      source_note: "Synthetic",
+    },
+  ];
+  const text = JSON.stringify(snapshot);
+  await act(async () =>
+    fireEvent.change(screen.getByLabelText("Load monthly inputs (JSON)"), {
+      target: { files: [{ size: text.length, text: async () => text }] },
+    }),
+  );
+  await screen.findByText("$43,750");
+  assert.equal(
+    screen.queryByLabelText("Tangible personal property collection rate"),
+    null,
+  );
+  fireEvent.change(screen.getByLabelText("TPP capture rate"), {
+    target: { value: "50" },
+  });
+  assert.ok(screen.getByText("$87,500"));
+  const axe = (await import("axe-core")).default;
+  const violations = await axe.run(document.body, {
+    rules: { "color-contrast": { enabled: false }, region: { enabled: false } },
+  });
+  assert.deepEqual(
+    violations.violations.map((v) => v.id),
+    [],
+  );
+  await act(async () =>
+    fireEvent.change(screen.getByLabelText("Load monthly inputs (JSON)"), {
+      target: { files: [{ size: 2, text: async () => "{}" }] },
+    }),
+  );
+  assert.ok(screen.getByRole("alert"));
+  assert.ok(screen.getByText("$87,500"));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Restore published inputs" }),
+  );
+  assert.ok(screen.getByText(/No dated inputs published/));
+});
+
+test("pilot import shows recipient allocation, independent confirmation and clear state", async () => {
+  const PilotPlanner = (await import("../src/PilotPlanner.tsx")).default;
+  render(
+    React.createElement(PilotPlanner, {
+      item: { kind: "counties", slug: "shelby", name: "SHELBY" } as any,
+    }),
+  );
+  fireEvent.click(screen.getByText("Pilot stress test & cost comparison"));
+  const inputs = {
+    tppLeads: 1000,
+    licenseLeads: 200,
+    tppPerCase: 100,
+    collectionPercent: 80,
+    licenseFee: 20,
+    situsFlagged: 51,
+    situsPerLocation: 1000,
+    lookbackYears: 1,
+    forwardYears: 2,
+    situsCost: 1000,
+    leadUnitCost: 5,
+    billableLeads: 1000,
+    tppHitPercent: 10,
+    licenseHitPercent: 50,
+    situsHitPercent: 10,
+    countySharePercent: null,
+    rounding: "nearest",
+  };
+  const text = JSON.stringify({
+    schemaVersion: 1,
+    kind: "pilot-scenario",
+    jurisdiction: "shelby",
+    asOf: "2026-09-30",
+    source: "Synthetic QA",
+    inputs,
+  });
+  await act(async () =>
+    fireEvent.change(screen.getByLabelText("Load pilot scenario (JSON)"), {
+      target: { files: [{ size: text.length, text: async () => text }] },
+    }),
+  );
+  assert.ok(screen.getByText("$25,000"));
+  assert.ok(screen.getByText("Withheld · county share needed"));
+  fireEvent.change(
+    screen.getByLabelText("County share of situs recovery (%)"),
+    { target: { value: "40" } },
+  );
+  assert.ok(screen.getByText("$16,000"));
+  fireEvent.change(screen.getByLabelText("License confirmation rate (%)"), {
+    target: { value: "0" },
+  });
+  assert.ok(screen.getByText("$14,000"));
+  fireEvent.change(screen.getByLabelText("TPP confirmation rate (%)"), {
+    target: { value: "101" },
+  });
+  assert.equal(
+    (
+      screen.getByRole("button", {
+        name: "Export pilot scenario",
+      }) as HTMLButtonElement
+    ).disabled,
+    true,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Clear pilot assumptions" }),
+  );
+  assert.equal(
+    (screen.getByLabelText("Assumption source") as HTMLInputElement).value,
+    "",
+  );
+});
+
+test("overview metrics drill into sorted county counts and priorities filter the queue", async () => {
+  const router = mount("/");
+  for (const [label, sort] of [
+    ["Counties represented", "name"],
+    ["Rooftops placed", "rooftops"],
+    ["Business points", "biz"],
+    ["Cross-county exposure", "cc"],
+  ]) {
+    await screen.findByRole("heading", {
+      name: "Clarity starts with the right location.",
+    });
+    fireEvent.click(screen.getByRole("link", { name: new RegExp(label) }));
+    await screen.findByRole("heading", {
+      name: "Every county. A clearer picture.",
+    });
+    assert.equal(router.state.location.pathname, "/counties");
+    assert.equal(
+      (screen.getByRole("combobox") as HTMLSelectElement).value,
+      sort,
+    );
+    assert.equal(document.querySelectorAll("tbody tr").length, 95);
+    assert.ok(screen.getByRole("columnheader", { name: "Rooftops placed" }));
+    if (sort !== "name") {
+      const col = { biz: 2, rooftops: 3, cc: 4 }[sort]!;
+      const values = [...document.querySelectorAll("tbody tr")].map((row) =>
+        Number(row.children[col].textContent!.replaceAll(",", "")),
+      );
+      assert.ok(values.every((v, i) => i === 0 || values[i - 1] >= v));
+    }
+    await act(async () => {
+      await router.navigate("/");
+    });
+  }
+  await screen.findByRole("heading", { name: "Priority counties" });
+  fireEvent.click(document.querySelector("a.priority")!);
+  await screen.findByRole("combobox", { name: "Reason" });
+  assert.equal(
+    (screen.getByRole("combobox", { name: "Reason" }) as HTMLSelectElement)
+      .value,
+    "CROSS_COUNTY_POSTAL",
+  );
 });

@@ -6,6 +6,8 @@ on:
     paths:
       [
         "web/**",
+        "data/estimates/**",
+        "fetch/estimate_refresh.py",
         "site/**",
         "configs/tn_county_paths.json",
         "vercel.json",
@@ -22,6 +24,9 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - run: npm --prefix web ci
       - run: npm --prefix web run build
       - run: npm --prefix web test

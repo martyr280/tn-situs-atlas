@@ -1830,3 +1830,51 @@ summary {
     scroll-behavior: auto !important;
   }
 }
+
+.estimates {
+  margin-top: 24px;
+}
+.estimate-body {
+  padding: 0 24px 24px;
+}
+.estimate-actions,
+.estimate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 20px;
+}
+.estimate-actions label,
+.estimate-card label {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+}
+.estimate-card {
+  border: 1px solid var(--line, #dce3e0);
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 0;
+}
+.estimate-card input,
+.estimate-actions select,
+.estimate-actions input {
+  width: 100%;
+  min-width: 0;
+}
+.estimates p {
+  line-height: 1.6;
+}
+.estimates caption {
+  text-align: left;
+  font-weight: 600;
+  padding: 12px;
+}
+.estimates .muted {
+  color: #586963;
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  .estimate-body {
+    padding: 0 14px 14px;
+  }
+}

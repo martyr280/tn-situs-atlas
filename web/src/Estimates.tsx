@@ -322,9 +322,9 @@ function Calculator({
           <label>
             {measure === "tppFiled"
               ? "Annual tax per modeled case ($)"
-              : "Annual fee per modeled case ($)"}
+              : "One-time license fee per modeled case ($)"}
             <input
-              aria-label={`${label} annual amount`}
+              aria-label={`${label} ${measure === "tppFiled" ? "annual amount" : "one-time fee"}`}
               type="number"
               min="0"
               step="any"
@@ -352,7 +352,10 @@ function Calculator({
                 Modeled cases: <strong>{number(result.modeledCases)}</strong>
               </p>
               <p>
-                Annual scenario: <strong>{money(result.annualRevenue)}</strong>
+                {measure === "tppFiled"
+                  ? "Annual TPP scenario:"
+                  : "One-time license fee scenario:"}{" "}
+                <strong>{money(result.annualRevenue)}</strong>
               </p>
             </div>
           )}
@@ -367,10 +370,21 @@ function Calculator({
                     input,
                     measure,
                     assumptions,
-                    result,
+                    result: result
+                      ? {
+                          difference: result.difference,
+                          screeningGap: result.screeningGap,
+                          modeledCases: result.modeledCases,
+                          revenue: result.annualRevenue,
+                        }
+                      : null,
+                    period:
+                      measure === "tppFiled"
+                        ? "one year"
+                        : "one-time initial fees",
                     exportedAt: new Date().toISOString(),
                     notice:
-                      "Planning scenario, not verified non-filers or realized revenue. Gap × assumed eligible share × annual amount × collection rate. Do not sum overlapping populations or jurisdictions.",
+                      "Planning scenario, not verified non-filers or realized revenue. Gap × assumed eligible share × per-case amount × collection rate. Do not sum overlapping populations or jurisdictions.",
                   },
                   null,
                   2,

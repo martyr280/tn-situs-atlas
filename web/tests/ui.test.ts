@@ -452,3 +452,74 @@ test("recovery benchmark import calculates TPP with capture rate and restores th
   );
   assert.ok(screen.getByText(/No dated inputs published/));
 });
+
+test("pilot import shows recipient allocation, independent confirmation and clear state", async () => {
+  const PilotPlanner = (await import("../src/PilotPlanner.tsx")).default;
+  render(
+    React.createElement(PilotPlanner, {
+      item: { kind: "counties", slug: "shelby", name: "SHELBY" } as any,
+    }),
+  );
+  fireEvent.click(screen.getByText("Pilot stress test & cost comparison"));
+  const inputs = {
+    tppLeads: 1000,
+    licenseLeads: 200,
+    tppPerCase: 100,
+    collectionPercent: 80,
+    licenseFee: 20,
+    situsFlagged: 51,
+    situsPerLocation: 1000,
+    lookbackYears: 1,
+    forwardYears: 2,
+    situsCost: 1000,
+    leadUnitCost: 5,
+    billableLeads: 1000,
+    tppHitPercent: 10,
+    licenseHitPercent: 50,
+    situsHitPercent: 10,
+    countySharePercent: null,
+    rounding: "nearest",
+  };
+  const text = JSON.stringify({
+    schemaVersion: 1,
+    kind: "pilot-scenario",
+    jurisdiction: "shelby",
+    asOf: "2026-09-30",
+    source: "Synthetic QA",
+    inputs,
+  });
+  await act(async () =>
+    fireEvent.change(screen.getByLabelText("Load pilot scenario (JSON)"), {
+      target: { files: [{ size: text.length, text: async () => text }] },
+    }),
+  );
+  assert.ok(screen.getByText("$25,000"));
+  assert.ok(screen.getByText("Withheld · county share needed"));
+  fireEvent.change(
+    screen.getByLabelText("County share of situs recovery (%)"),
+    { target: { value: "40" } },
+  );
+  assert.ok(screen.getByText("$16,000"));
+  fireEvent.change(screen.getByLabelText("License confirmation rate (%)"), {
+    target: { value: "0" },
+  });
+  assert.ok(screen.getByText("$14,000"));
+  fireEvent.change(screen.getByLabelText("TPP confirmation rate (%)"), {
+    target: { value: "101" },
+  });
+  assert.equal(
+    (
+      screen.getByRole("button", {
+        name: "Export pilot scenario",
+      }) as HTMLButtonElement
+    ).disabled,
+    true,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Clear pilot assumptions" }),
+  );
+  assert.equal(
+    (screen.getByLabelText("Assumption source") as HTMLInputElement).value,
+    "",
+  );
+});

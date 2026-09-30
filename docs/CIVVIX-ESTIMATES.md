@@ -25,7 +25,7 @@ For recovery-style input, each `tppBenchmarks` row uses its existing field names
 
 Screening gap = max(0, registration population − filing/license count).
 Modeled cases = gap × assumed eligible share / 100.
-Annual scenario = modeled cases × annual amount per case × collection rate / 100.
+Scenario revenue = modeled cases × per-case amount × collection rate / 100. TPP covers one year; business-license scenarios cover one-time initial fees. Recurring minimal-activity renewals require a separately established cohort and are not assumed here.
 
 The subtraction compares aggregate counts, not individual matched businesses. Different periods and counting units, exemptions, inactive locations, and entity/location differences must be reconciled. UCC leads are contextual and never added to registrations. Missing counts stay unavailable; zero is a valid supplied count. TPP filings never substitute for licenses. No arrears, penalties or growth are assumed; overlapping county/city or program totals must not be summed as independent recoveries. Dollar results are rounded only for display; export retains precision. Annual amounts are deliberately blank until supplied by the analyst.
 
@@ -49,3 +49,11 @@ The Python import preserves older months, rejects duplicate records and malforme
 ## Verification
 
 Automated coverage includes missing versus zero counts, negative differences, percentages outside range, source provenance, duplicate months, city/TPP separation, Python history retention and conflict handling, session input import, calculator edits, invalid input and export gating. Existing atlas coverage and review/roster tests remain in place. Browser visual verification and deployment status are recorded separately when completed.
+
+## Pilot stress test
+
+County workspaces also include a separate pilot planner with manually entered assumptions or a session-only `pilot-scenario` JSON import. Required fields are defined in `web/src/pilot.ts`; every file includes jurisdiction, assumption date and source. Monetary inputs start blank.
+
+The planner keeps TPP, license and situs confirmation rates independent. TPP covers one year, license fees apply once, and situs lookback/forward periods are separately entered. Whole-case rounding and fractional expected-case modes are explicit. Distinct billable leads are priced once even when program lead pools overlap. Costs equal the one-time situs service cost plus billable leads times price per lead.
+
+All-local benefit/cost includes all situs recipients and the stated mixed periods. A county-only result remains withheld until an explicit county situs allocation is entered. Zero-cost scenarios have no benefit/cost multiple. The planner neither determines legal lookback periods nor certifies a procurement path. Do not add its results to the alternative county benchmark or countywide scenario for the same population.

@@ -41,6 +41,7 @@ import {
   type Review,
 } from "./model";
 import type { MatchResult } from "./matching";
+const PilotPlanner = lazy(() => import("./PilotPlanner"));
 const Estimates = lazy(() => import("./Estimates"));
 const MapView = lazy(() => import("./MapView"));
 const Importer = lazy(() => import("./Importer"));
@@ -558,6 +559,7 @@ export default function Workspace({
       )}
       <Suspense fallback={<p>Loading planning tools…</p>}>
         <Estimates item={item} />
+        {kind === "counties" && <PilotPlanner item={item} />}
       </Suspense>
     </div>
   );

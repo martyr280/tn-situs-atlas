@@ -1878,3 +1878,9 @@ summary {
     padding: 0 14px 14px;
   }
 }
+.pilot-planner > summary {
+  cursor: pointer;
+  padding: 22px 24px;
+  font-size: 18px;
+  font-weight: 650;
+}

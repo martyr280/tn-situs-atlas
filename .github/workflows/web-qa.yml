@@ -1,0 +1,32 @@
+name: Civvix web QA
+on:
+  pull_request:
+  push:
+    branches: [main, feat/civvix-workspace]
+    paths:
+      [
+        "web/**",
+        "site/**",
+        "configs/tn_county_paths.json",
+        "vercel.json",
+        ".github/workflows/web-qa.yml",
+      ]
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - run: npm --prefix web run build
+      - run: npm --prefix web test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: civvix-visual-qa
+          path: qa-screenshots/*.html
+          retention-days: 7

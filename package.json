@@ -1,0 +1,8 @@
+{
+  "name": "tn-situs-atlas",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix web ci && npm --prefix web run build",
+    "test": "npm --prefix web test"
+  }
+}

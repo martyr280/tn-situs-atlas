@@ -36,8 +36,10 @@ const requests: string[] = [];
 globalThis.fetch = async (input: RequestInfo | URL) => {
   const url = String(input);
   requests.push(url);
-  const file = path.join(root, "web/public", url);
-  if (!file.startsWith(path.join(root, "web/public") + "/"))
+  const publicRoot = path.join(root, "web/public");
+  const file = path.join(publicRoot, url);
+  const relative = path.relative(publicRoot, file);
+  if (relative.startsWith("..") || path.isAbsolute(relative))
     return new Response("", { status: 404 });
   try {
     return new Response(fs.readFileSync(file), { status: 200 });
@@ -328,7 +330,7 @@ test("structural accessibility check on overview and sparse county", async () =>
 });
 
 test("jurisdiction estimates require explicit assumptions and do not substitute TPP for licenses", async () => {
-  const Estimates = (await import("../src/Estimates.tsx")).default;
+  const Estimates = (await import("../src/JurisdictionEstimates.tsx")).default;
   const catalog = JSON.parse(
     fs.readFileSync(path.join(root, "site/data/statewide_index.json"), "utf8"),
   );
@@ -389,7 +391,7 @@ test("jurisdiction estimates require explicit assumptions and do not substitute 
 });
 
 test("recovery benchmark import calculates TPP with capture rate and restores the empty published state", async () => {
-  const Estimates = (await import("../src/Estimates.tsx")).default;
+  const Estimates = (await import("../src/JurisdictionEstimates.tsx")).default;
   render(
     React.createElement(Estimates, {
       item: { kind: "counties", slug: "shelby", name: "SHELBY" } as any,
@@ -521,6 +523,79 @@ test("pilot import shows recipient allocation, independent confirmation and clea
   assert.equal(
     (screen.getByLabelText("Assumption source") as HTMLInputElement).value,
     "",
+  );
+});
+
+test("clearing monthly inputs cancels pending reads and newer imports win", async () => {
+  const Estimates = (await import("../src/JurisdictionEstimates.tsx")).default;
+  render(
+    React.createElement(Estimates, {
+      item: { kind: "counties", slug: "shelby", name: "SHELBY" } as any,
+    }),
+  );
+  await screen.findByText(/No dated inputs published/);
+  const fixture = fs.readFileSync(
+    path.join(root, "web/tests/fixtures/estimates.json"),
+    "utf8",
+  );
+  let finish!: (text: string) => void;
+  const start = () => {
+    const text = new Promise<string>((resolve) => {
+      finish = resolve;
+    });
+    fireEvent.change(screen.getByLabelText("Load monthly inputs (JSON)"), {
+      target: { files: [{ size: fixture.length, text: () => text }] },
+    });
+  };
+  start();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Restore published inputs" }),
+  );
+  await act(async () => finish(fixture));
+  assert.ok(screen.getByText(/No dated inputs published/));
+  assert.equal(screen.queryByText("600"), null);
+  start();
+  await act(async () =>
+    fireEvent.change(screen.getByLabelText("Load monthly inputs (JSON)"), {
+      target: { files: [{ size: fixture.length, text: async () => fixture }] },
+    }),
+  );
+  await act(async () => finish("{}"));
+  assert.ok(screen.getByText("600"));
+  assert.equal(screen.queryByRole("alert"), null);
+});
+
+test("clearing pilot assumptions cancels a pending import", async () => {
+  const Planner = (await import("../src/PilotPlanner.tsx")).default;
+  render(
+    React.createElement(Planner, {
+      item: { kind: "counties", slug: "shelby", name: "SHELBY" } as any,
+    }),
+  );
+  fireEvent.click(screen.getByText("Pilot stress test & cost comparison"));
+  let finish!: (text: string) => void;
+  const pending = new Promise<string>((resolve) => {
+    finish = resolve;
+  });
+  fireEvent.change(screen.getByLabelText("Load pilot scenario (JSON)"), {
+    target: { files: [{ size: 2, text: () => pending }] },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Clear pilot assumptions" }),
+  );
+  await act(async () => finish("{}"));
+  assert.equal(screen.queryByRole("alert"), null);
+  assert.equal(
+    (screen.getByLabelText("Assumption source") as HTMLInputElement).value,
+    "",
+  );
+  assert.equal(
+    (
+      screen.getByRole("button", {
+        name: "Export pilot scenario",
+      }) as HTMLButtonElement
+    ).disabled,
+    true,
   );
 });
 

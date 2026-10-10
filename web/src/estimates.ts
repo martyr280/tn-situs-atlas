@@ -37,6 +37,7 @@ export function validateSnapshot(input: unknown): EstimateSnapshot {
       !["counties", "cities"].includes(r.kind) ||
       typeof r.slug !== "string" ||
       !/^[a-z0-9_-]+$/.test(r.slug) ||
+      typeof r.month !== "string" ||
       !monthPattern.test(r.month)
     )
       throw Error("Invalid jurisdiction or snapshot month.");

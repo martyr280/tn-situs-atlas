@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useData } from "./data";
 import { download, money, number, type CatalogItem } from "./model";
 import {
@@ -14,6 +14,14 @@ export default function Estimates({ item }: { item: CatalogItem }) {
   const [uploaded, setUploaded] = useState<EstimateSnapshot | null>(null);
   const [error, setError] = useState("");
   const [month, setMonth] = useState("");
+  const importVersion = useRef(0);
+  const [reading, setReading] = useState(false);
+  useEffect(
+    () => () => {
+      importVersion.current++;
+    },
+    [],
+  );
   const records =
     (uploaded || source.data)?.records
       .filter((r) => r.kind === item.kind && r.slug === item.slug)
@@ -85,10 +93,14 @@ export default function Estimates({ item }: { item: CatalogItem }) {
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
+                const version = ++importVersion.current;
+                e.target.value = "";
+                setReading(true);
                 try {
                   if (file.size > 2_000_000)
                     throw Error("Use an aggregate snapshot smaller than 2 MB.");
                   const next = validateSnapshot(JSON.parse(await file.text()));
+                  if (version !== importVersion.current) return;
                   if (
                     !next.records.some(
                       (r) => r.kind === item.kind && r.slug === item.slug,
@@ -101,13 +113,15 @@ export default function Estimates({ item }: { item: CatalogItem }) {
                   setMonth("");
                   setError("");
                 } catch (err) {
+                  if (version !== importVersion.current) return;
                   setError(
                     err instanceof Error
                       ? err.message
                       : "Unable to read inputs.",
                   );
+                } finally {
+                  if (version === importVersion.current) setReading(false);
                 }
-                e.target.value = "";
               }}
             />
           </label>
@@ -151,9 +165,11 @@ export default function Estimates({ item }: { item: CatalogItem }) {
           >
             Download input template
           </button>
-          {uploaded && (
+          {(uploaded || reading) && (
             <button
               onClick={() => {
+                importVersion.current++;
+                setReading(false);
                 setUploaded(null);
                 setMonth("");
                 setError("");
@@ -404,8 +420,10 @@ function Calculator({
         </p>
       )}
       <p className="muted">
-        Gap × eligible share × annual amount × collection rate. Fractional cases
-        represent an expectation. No arrears, penalties or growth included.
+        Gap × eligible share ×{" "}
+        {measure === "tppFiled" ? "annual tax" : "one-time fee"} × collection
+        rate. Fractional cases represent an expectation. No arrears, penalties
+        or growth included.
       </p>
     </section>
   );

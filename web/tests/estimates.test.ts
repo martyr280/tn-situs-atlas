@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { estimate, validateSnapshot } from "../src/estimates.ts";
 const baseline = JSON.parse(
   fs.readFileSync(
@@ -54,6 +55,9 @@ test("provenance, duplicate periods, cities and bad counts are rejected", () => 
       r.month = "2026-13";
     },
     (r: any) => {
+      r.month = ["2026-08"];
+    },
+    (r: any) => {
       r.kind = "cities";
     },
     (r: any) => {
@@ -76,11 +80,13 @@ test("Python monthly import retains history and rejects conflicting replacement 
   try {
     const input = path.join(dir, "input.json"),
       output = path.join(dir, "monthly.json");
-    const script = new URL("../../fetch/estimate_refresh.py", import.meta.url)
-      .pathname;
+    const script = fileURLToPath(
+      new URL("../../fetch/estimate_refresh.py", import.meta.url),
+    );
     const run = (...extra: string[]) =>
       spawnSync(
-        "python3",
+        process.env.ATLAS_PYTHON ||
+          (process.platform === "win32" ? "py" : "python3"),
         [script, "--input", input, "--output", output, ...extra],
         { encoding: "utf8" },
       );

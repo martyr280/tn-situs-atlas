@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { download, money, number, type CatalogItem } from "./model";
 import {
   pilotFields,
@@ -13,6 +13,13 @@ const empty = () =>
     string
   >;
 export default function PilotPlanner({ item }: { item: CatalogItem }) {
+  const importVersion = useRef(0);
+  useEffect(
+    () => () => {
+      importVersion.current++;
+    },
+    [],
+  );
   const [values, setValues] = useState(empty),
     [source, setSource] = useState(""),
     [asOf, setAsOf] = useState("");
@@ -67,10 +74,13 @@ export default function PilotPlanner({ item }: { item: CatalogItem }) {
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
+                const version = ++importVersion.current;
+                e.target.value = "";
                 try {
                   if (file.size > 200000)
                     throw Error("Use a pilot file smaller than 200 KB.");
                   const d = validatePilot(JSON.parse(await file.text()));
+                  if (version !== importVersion.current) return;
                   if (d.jurisdiction !== item.slug)
                     throw Error("Pilot file is for a different jurisdiction.");
                   setValues(
@@ -88,14 +98,43 @@ export default function PilotPlanner({ item }: { item: CatalogItem }) {
                   setAsOf(d.asOf);
                   setFileError("");
                 } catch (err) {
+                  if (version !== importVersion.current) return;
                   setFileError((err as Error).message);
                 }
-                e.target.value = "";
               }}
             />
           </label>
           <button
+            onClick={() =>
+              download(
+                `civvix-${item.slug}-pilot-template.json`,
+                JSON.stringify(
+                  {
+                    schemaVersion: 1,
+                    kind: "pilot-scenario",
+                    jurisdiction: item.slug,
+                    asOf: "",
+                    source: "",
+                    inputs: {
+                      ...Object.fromEntries(
+                        pilotFields.map((f) => [f.key, null]),
+                      ),
+                      countySharePercent: null,
+                      rounding: "nearest",
+                    },
+                  },
+                  null,
+                  2,
+                ),
+                "application/json",
+              )
+            }
+          >
+            Download pilot template
+          </button>
+          <button
             onClick={() => {
+              importVersion.current++;
               setValues(empty());
               setSource("");
               setAsOf("");

@@ -42,7 +42,7 @@ import {
 } from "./model";
 import type { MatchResult } from "./matching";
 const PilotPlanner = lazy(() => import("./PilotPlanner"));
-const Estimates = lazy(() => import("./Estimates"));
+const Estimates = lazy(() => import("./JurisdictionEstimates"));
 const MapView = lazy(() => import("./MapView"));
 const Importer = lazy(() => import("./Importer"));
 export default function Workspace({

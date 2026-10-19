@@ -114,6 +114,62 @@ test("Python monthly import retains history and rejects conflicting replacement 
   }
 });
 
+test("Python UTF-8 imports round-trip Unicode and remain byte-idempotent under a legacy locale", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "civvix-unicode-"));
+  try {
+    const input = path.join(dir, "input.json");
+    const output = path.join(dir, "monthly.json");
+    const data = structuredClone(baseline);
+    const note = "Synthetic café — 日本語 😀";
+    data.records[0].note = note;
+    data.records[0].population.source = note;
+    const script = fileURLToPath(
+      new URL("../../fetch/estimate_refresh.py", import.meta.url),
+    );
+    // Force implicit Path.read_text() to use cp1252 even on UTF-8-default hosts.
+    const launcher =
+      "import locale,runpy,sys; locale.getencoding=lambda:'cp1252'; sys.argv=sys.argv[1:]; runpy.run_path(sys.argv[0],run_name='__main__')";
+    const run = (...extra: string[]) =>
+      spawnSync(
+        process.env.ATLAS_PYTHON ||
+          (process.platform === "win32" ? "py" : "python3"),
+        [
+          "-X",
+          "utf8=0",
+          "-c",
+          launcher,
+          script,
+          "--input",
+          input,
+          "--output",
+          output,
+          ...extra,
+        ],
+        { encoding: "utf8", env: { ...process.env, PYTHONUTF8: "0" } },
+      );
+    fs.writeFileSync(input, JSON.stringify(data), "utf8");
+    assert.equal(run().status, 0);
+    const bytes = fs.readFileSync(output);
+    assert.equal(JSON.parse(bytes.toString("utf8")).records[0].note, note);
+    assert.equal(run().status, 0);
+    assert.deepEqual(fs.readFileSync(output), bytes);
+    assert.equal(run("--check").status, 0);
+    assert.deepEqual(fs.readFileSync(output), bytes);
+    data.records[0].month = "2026-10";
+    fs.writeFileSync(input, JSON.stringify(data), "utf8");
+    assert.equal(run().status, 0);
+    const records = JSON.parse(fs.readFileSync(output, "utf8")).records;
+    assert.equal(records.length, 2);
+    assert.ok(
+      records.every(
+        (row: any) => row.note === note && row.population.source === note,
+      ),
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("recovery methodology uses latest returns, weighted newest three years and one capture multiplier", async () => {
   const { tppOpportunity } = await import("../src/estimates.ts");
   const benchmarks = [

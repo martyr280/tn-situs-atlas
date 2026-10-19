@@ -70,8 +70,8 @@ def main():
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()
     try:
-        incoming = validate(json.loads(args.input.read_text()))
-        existing = validate(json.loads(args.output.read_text())) if args.output.exists() else {'schemaVersion': 1, 'records': []}
+        incoming = validate(json.loads(args.input.read_text(encoding='utf-8')))
+        existing = validate(json.loads(args.output.read_text(encoding='utf-8'))) if args.output.exists() else {'schemaVersion': 1, 'records': []}
         key = lambda row: (row['kind'], row['slug'], row['month'])
         merged = {key(r): r for r in existing['records']}
         for row in incoming['records']:

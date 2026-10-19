@@ -526,6 +526,109 @@ test("pilot import shows recipient allocation, independent confirmation and clea
   );
 });
 
+test("roster clear, newer files and pasted edits invalidate pending file reads", async () => {
+  const Importer = (await import("../src/Importer.tsx")).default;
+  render(
+    React.createElement(Importer, {
+      records: [],
+      onApply: () => {},
+      onClear: () => {},
+      applied: false,
+    }),
+  );
+  const field = () =>
+    screen.getByRole("textbox", {
+      name: "Paste roster CSV",
+    }) as HTMLTextAreaElement;
+  let finish!: (text: string) => void;
+  const start = () => {
+    const pending = new Promise<string>((resolve) => {
+      finish = resolve;
+    });
+    fireEvent.change(screen.getByLabelText("Choose roster CSV"), {
+      target: { files: [{ size: 10, text: () => pending }] },
+    });
+  };
+  start();
+  fireEvent.click(screen.getByRole("button", { name: "Clear imported data" }));
+  await act(async () => finish("stale synthetic roster"));
+  assert.equal(field().value, "");
+  start();
+  await act(async () =>
+    fireEvent.change(screen.getByLabelText("Choose roster CSV"), {
+      target: {
+        files: [{ size: 10, text: async () => "new synthetic roster" }],
+      },
+    }),
+  );
+  await act(async () => finish("older synthetic roster"));
+  assert.equal(field().value, "new synthetic roster");
+  start();
+  fireEvent.change(field(), { target: { value: "pasted synthetic roster" } });
+  await act(async () => finish("stale synthetic roster"));
+  assert.equal(field().value, "pasted synthetic roster");
+});
+
+test("cleared roster ignores already queued Worker callbacks", async () => {
+  const Importer = (await import("../src/Importer.tsx")).default;
+  let pending!: { onmessage: ((e: { data: unknown }) => void) | null };
+  class DelayedWorker extends TestWorker {
+    postMessage() {
+      pending = this;
+    }
+  }
+  Object.defineProperty(globalThis, "Worker", {
+    value: DelayedWorker,
+    writable: true,
+  });
+  try {
+    render(
+      React.createElement(Importer, {
+        records: [],
+        onApply: () => {},
+        onClear: () => {},
+        applied: false,
+      }),
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Paste roster CSV" }),
+      { target: { value: "name,address,situs\nSynthetic,1 TEST ST,9501" } },
+    );
+    const read = screen.getByRole("button", {
+      name: "Read CSV",
+    }) as HTMLButtonElement;
+    await waitFor(() => assert.equal(read.disabled, false));
+    fireEvent.click(read);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear imported data" }),
+    );
+    await act(async () =>
+      pending.onmessage?.({
+        data: {
+          rows: [
+            ["name", "address", "situs"],
+            ["Stale", "1 TEST ST", "9501"],
+          ],
+        },
+      }),
+    );
+    assert.equal(screen.queryByText("Confirm the column mapping"), null);
+    assert.equal(
+      (
+        screen.getByRole("textbox", {
+          name: "Paste roster CSV",
+        }) as HTMLTextAreaElement
+      ).value,
+      "",
+    );
+  } finally {
+    Object.defineProperty(globalThis, "Worker", {
+      value: TestWorker,
+      writable: true,
+    });
+  }
+});
+
 test("clearing monthly inputs cancels pending reads and newer imports win", async () => {
   const Estimates = (await import("../src/JurisdictionEstimates.tsx")).default;
   render(

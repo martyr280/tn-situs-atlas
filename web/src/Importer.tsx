@@ -30,8 +30,21 @@ export default function Importer({
     [error, setError] = useState(""),
     [page, setPage] = useState(0);
   const worker = useRef<Worker | null>(null),
-    fileRef = useRef<HTMLInputElement>(null);
-  useEffect(() => () => worker.current?.terminate(), []);
+    fileRef = useRef<HTMLInputElement>(null),
+    importVersion = useRef(0);
+  function invalidate() {
+    importVersion.current++;
+    worker.current?.terminate();
+    worker.current = null;
+    setBusy(false);
+  }
+  useEffect(
+    () => () => {
+      importVersion.current++;
+      worker.current?.terminate();
+    },
+    [],
+  );
   function run(mode: "parse" | "match") {
     setError("");
     if (!codes.data) {
@@ -44,13 +57,15 @@ export default function Importer({
       );
       return;
     }
-    worker.current?.terminate();
+    invalidate();
+    const version = importVersion.current;
     const w = new Worker(new URL("./import.worker.ts", import.meta.url), {
       type: "module",
     });
     worker.current = w;
     setBusy(true);
     w.onmessage = (e) => {
+      if (version !== importVersion.current) return;
       setBusy(false);
       if (e.data.error) setError(e.data.error);
       else if (mode === "parse") {
@@ -79,6 +94,7 @@ export default function Importer({
       w.terminate();
     };
     w.onerror = () => {
+      if (version !== importVersion.current) return;
       setBusy(false);
       setError(
         "The file could not be processed. Your current session was not changed.",
@@ -97,8 +113,7 @@ export default function Importer({
   );
   const matched = results.filter((r) => r.state === "matched");
   const clear = () => {
-    worker.current?.terminate();
-    setBusy(false);
+    invalidate();
     setText("");
     setRows([]);
     setResults([]);
@@ -155,13 +170,26 @@ export default function Importer({
             onChange={async (e) => {
               const f = e.target.files?.[0];
               if (!f) return;
+              invalidate();
+              const version = importVersion.current;
+              e.target.value = "";
               if (f.size > 10 * 1024 * 1024) {
                 setError("This file exceeds the 10 MB limit.");
                 return;
               }
-              setText(await f.text());
-              setRows([]);
-              setResults([]);
+              try {
+                const next = await f.text();
+                if (version !== importVersion.current) return;
+                setText(next);
+                setRows([]);
+                setResults([]);
+                setError("");
+              } catch {
+                if (version === importVersion.current)
+                  setError(
+                    "The file could not be read. Your current session was not changed.",
+                  );
+              }
             }}
           />
         </label>
@@ -175,6 +203,7 @@ export default function Importer({
               "business_name,physical_address,situs\nExample Company,123 MAIN ST LEBANON 37087,9501"
             }
             onChange={(e) => {
+              invalidate();
               setText(e.target.value);
               setRows([]);
               setResults([]);
@@ -197,8 +226,7 @@ export default function Importer({
         {busy && (
           <button
             onClick={() => {
-              worker.current?.terminate();
-              setBusy(false);
+              invalidate();
               setError("Processing canceled. Nothing was applied.");
             }}
           >
@@ -238,6 +266,7 @@ export default function Importer({
                 <select
                   value={mapping[i]}
                   onChange={(e) => {
+                    invalidate();
                     setMapping((v) =>
                       v.map((n, j) => (j === i ? +e.target.value : n)),
                     );

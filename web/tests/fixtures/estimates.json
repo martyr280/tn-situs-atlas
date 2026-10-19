@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "kind": "counties",
+      "slug": "shelby",
+      "month": "2026-08",
+      "status": "reported-baseline",
+      "population": {
+        "value": 1000,
+        "period": "2026-08",
+        "source": "Synthetic test fixture"
+      },
+      "tppFiled": {
+        "value": 400,
+        "period": "2025",
+        "source": "Synthetic test fixture"
+      },
+      "note": "Synthetic QA inputs, not jurisdiction facts."
+    }
+  ]
+}

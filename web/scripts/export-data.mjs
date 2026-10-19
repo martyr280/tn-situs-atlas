@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { validateSnapshot } from "../src/estimates.ts";
 import path from "node:path";
 import crypto from "node:crypto";
 import { gzipSync } from "node:zlib";
@@ -141,6 +142,12 @@ for (const item of routes) {
     sources,
   });
 }
+const estimates = validateSnapshot(read("data/estimates/monthly.json"));
+for (const r of estimates.records) {
+  if (!catalog.some((c) => c.kind === r.kind && c.slug === r.slug))
+    throw Error(`Unknown estimate jurisdiction ${r.kind}/${r.slug}`);
+}
+write("estimates.json", estimates);
 write("catalog.json", catalog);
 write("statewide.json", index);
 write("cities.json", cities);

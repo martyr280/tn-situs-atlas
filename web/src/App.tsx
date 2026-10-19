@@ -280,21 +280,32 @@ function Stat({
   value,
   detail,
   icon: Icon,
+  to,
 }: {
   label: string;
   value: string;
   detail: string;
   icon: typeof Landmark;
+  to?: string;
 }) {
-  return (
-    <div className="stat-card">
+  const content = (
+    <>
       <div>
         {label}
         <Icon size={18} />
       </div>
       <strong>{value}</strong>
-      <span>{detail}</span>
-    </div>
+      <span>
+        {detail} {to && <ArrowUpRight size={14} aria-hidden="true" />}
+      </span>
+    </>
+  );
+  return to ? (
+    <Link className="stat-card" to={to}>
+      {content}
+    </Link>
+  ) : (
+    <div className="stat-card">{content}</div>
   );
 }
 function Overview({
@@ -322,24 +333,28 @@ function Overview({
       </PageHeading>
       <div className="stats">
         <Stat
+          to="/counties"
           label="Counties represented"
           value={number(release.countyCount)}
           detail="Statewide public-data coverage"
           icon={Landmark}
         />
         <Stat
+          to="/counties?sort=rooftops"
           label="Rooftops placed"
           value={number(release.totals.rooftops)}
           detail="Located in DOR situs polygons"
           icon={MapPinned}
         />
         <Stat
+          to="/counties?sort=biz"
           label="Business points"
           value={number(release.totals.biz)}
           detail="Statewide index snapshot"
           icon={Building2}
         />
         <Stat
+          to="/counties?sort=cc"
           label="Cross-county exposure"
           value={number(release.totals.cc)}
           detail="Postal signals awaiting verification"
@@ -379,7 +394,11 @@ function Overview({
             <p>Ranked by cross-county postal signals</p>
           </div>
           {ranked.map((c, i) => (
-            <Link className="priority" to={"/counties/" + c.slug} key={c.slug}>
+            <Link
+              className="priority"
+              to={"/counties/" + c.slug + "?reason=CROSS_COUNTY_POSTAL"}
+              key={c.slug}
+            >
               <span className="rank">0{i + 1}</span>
               <div>
                 <strong>{title(c.name)}</strong>
@@ -588,6 +607,7 @@ function Directory({
               <option value="name">Name</option>
               <option value="cc">Cross-county exposure</option>
               <option value="biz">Businesses</option>
+              <option value="rooftops">Rooftops placed</option>
               <option value="br">Boundary risk</option>
             </select>
           </label>
@@ -603,6 +623,9 @@ function Directory({
                 <th scope="col">{kind === "counties" ? "County" : "City"}</th>
                 <th scope="col" className="numeric">
                   Businesses
+                </th>
+                <th scope="col" className="numeric">
+                  Rooftops placed
                 </th>
                 <th scope="col" className="numeric">
                   Cross-county postal
@@ -643,6 +666,7 @@ function Directory({
                     )}
                   </th>
                   <td className="numeric">{number(c.biz)}</td>
+                  <td className="numeric">{number(c.rooftops)}</td>
                   <td className="numeric">{number(c.cc)}</td>
                   <td className="numeric">{number(c.br)}</td>
                   <td>
